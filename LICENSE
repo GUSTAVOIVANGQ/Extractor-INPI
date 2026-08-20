@@ -1,0 +1,15 @@
+# Política de uso interno
+
+Este repositorio contiene un extractor de información pública del INPI con fines de trabajo institucional.
+
+## Reglas sugeridas
+
+- Revisar el uso autorizado antes de redistribuir datos.
+- No publicar salidas sin validación del responsable del proyecto.
+- Mantener trazabilidad de cambios y versiones.
+- Documentar cualquier ajuste que afecte los archivos de salida.
+
+## Responsables
+
+- **Ivan Paredes** — `ivan.paredes@crt.gob.mx`
+- **Gustavo García** — `gustavo.garcia@crt.gob.mx`
