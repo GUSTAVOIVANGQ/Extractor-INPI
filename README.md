@@ -1,145 +1,97 @@
 # Extractor INPI — Cédulas por comunidad
 
-Este proyecto extrae datos del **Catálogo Nacional de Pueblos y Comunidades Indígenas y Afromexicanas** del INPI:
+Este proyecto extrae y consolida datos del **Catálogo Nacional de Pueblos y Comunidades Indígenas y Afromexicanas** del INPI:
 
 `https://catalogo.inpi.gob.mx/cedulas/`
 
-Para cada comunidad extrae:
+## Qué obtiene
 
-1. Las columnas de la tabla principal (pueblo, nombre, entidad, municipio).
-2. La información del encabezado del modal **Información** (número de registro, región, localidad, unidad administrativa).
-3. La pestaña **Datos Generales** (nombre en lengua indígena, tipo de comunidad, asentamientos, coordenadas, población, etc.).
-4. El HTML bruto del detalle se conserva en SQLite para poder auditar o re-procesar.
+Para cada comunidad, el sistema puede extraer:
 
----
+1. Las columnas visibles de la tabla principal.
+2. La información del encabezado del modal **Información**.
+3. La pestaña **Datos Generales**.
+4. El HTML bruto de las secciones procesadas para auditoría y reproceso.
+5. Archivos de salida en CSV, JSONL comprimido y una base SQLite de trabajo/reanudación.
 
-## Dos versiones
+## Versiones del proyecto
 
-| Archivo | Técnica | Velocidad | Dependencias |
-|---|---|---|---|
-| **`inpi_scraper_api.py`** ⭐ Recomendado | API HTTP directa | ~1.5–2.5 horas | `httpx`, `beautifulsoup4`, `lxml` (~2 MB) |
-| `inpi_scraper.py` (prototipo) | Playwright (navegador) | ~14–23 horas | `playwright` + Chromium (~500 MB) |
+El repositorio contiene dos implementaciones:
 
-La versión por API fue posible porque la página del INPI usa internamente dos endpoints REST:
-- `GET /Consulta/GetCedulas` — devuelve JSON paginado
-- `GET /Consulta/Details/{id}` — devuelve HTML del modal de detalle
+### 1) `inpi_scraper_api.py` — versión recomendada
 
----
+- Usa la API interna del sitio mediante HTTP directo.
+- Es más rápida y más estable.
+- No requiere Chromium para funcionar.
+- Incluye concurrencia controlada, reintentos, validación y reanudación por SQLite.
 
-## Instalación
+### 2) `inpi_scraper.py` — versión prototipo
+
+- Usa Playwright y navegador automatizado.
+- Es útil como alternativa si la API cambia.
+- Mantiene una lógica más conservadora basada en la interfaz del sitio.
+
+## Estado y enfoque
+
+Este programa está diseñado para:
+
+- extraer información de forma reproducible,
+- permitir reinicios sin perder avance,
+- guardar evidencia procesable para auditoría,
+- facilitar mantenimiento y futuras mejoras.
+
+## Dependencias
+
+Las dependencias se encuentran en `requirements.txt`.
+
+## Uso general
+
+1. Crear y activar un entorno virtual.
+2. Instalar dependencias.
+3. Ejecutar la versión recomendada:
 
 ```powershell
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-py -m pip install -r requirements.txt
+py inpi_scraper_api.py
 ```
 
-No necesitas instalar Chromium para la versión por API.
-
-## Uso: versión por API (recomendada)
-
-### 1. Prueba rápida (1 página = 10 registros)
+Para pruebas rápidas:
 
 ```powershell
 py inpi_scraper_api.py --max-pages 1
 ```
 
-### 2. Ejecutar todo el catálogo (~16,730 registros)
+## Estructura de salidas
 
-```powershell
-py inpi_scraper_api.py
-```
+Los resultados se guardan en `salida_inpi/`:
 
-### 3. Reanudar una ejecución interrumpida
+- `inpi_api.sqlite3`: base de trabajo y checkpoint.
+- `registros_inpi.csv`: exportación tabular.
+- `registros_inpi.jsonl.gz`: exportación estructurada.
 
-Simplemente vuelve a ejecutar:
+## Contribución
 
-```powershell
-py inpi_scraper_api.py
-```
+### Desarrollo principal
 
-SQLite recuerda qué páginas se indexaron y qué detalles se extrajeron. Solo procesa los faltantes.
+- **Ivan Paredes** — `ivan.paredes@crt.gob.mx`
 
-### Opciones útiles
+### Enlace de apoyo
 
-```powershell
-# Aumentar concurrencia (default: 3 solicitudes simultáneas)
-py inpi_scraper_api.py --concurrency 5
+- **Gustavo García** — `gustavo.garcia@crt.gob.mx`
 
-# Limitar detalles a extraer (para pruebas)
-py inpi_scraper_api.py --max-pages 1 --max-details 3
+### Lineamientos de contribución
 
-# Aumentar pausas si el servidor va lento
-py inpi_scraper_api.py --detail-delay-min 0.5 --detail-delay-max 1.0
+- Mantener compatibilidad con la versión recomendada por API.
+- Conservar la capacidad de reanudación mediante SQLite.
+- Documentar cambios funcionales, dependencias y ajustes de ejecución.
+- Agregar notas de versión cuando se introduzcan mejoras o correcciones.
 
-# Sin conservar HTML bruto (ahorra espacio en SQLite)
-py inpi_scraper_api.py --no-save-html
-```
+## Notas de versión
 
-### Archivos de salida
+Sugerencia para este repositorio:
 
-En `salida_inpi/`:
+- **v1.0**: prototipo inicial con Playwright.
+- **v2.0**: versión optimizada por API directa, con mayor rendimiento y estabilidad.
 
-| Archivo | Descripción |
-|---|---|
-| `inpi_api.sqlite3` | Base de trabajo y checkpoint. Soporta reanudación. |
-| `registros_inpi.csv` | Una fila por registro con campos planos + JSON. |
-| `registros_inpi.jsonl.gz` | Formato estructurado con tablas y objetos completos. |
+## Licencia y uso
 
-### Estructura de datos
-
-En `registros_inpi.jsonl.gz`, cada registro incluye:
-
-```json
-{
-  "id_registro": 18819,
-  "pueblo_indigena": "Afromexicano",
-  "cedula": "167-0008",
-  "nombre_comunidad": "El Nacimiento de los Negros Mascogos",
-  "entidad_federativa": "(05) Coahuila",
-  "municipio": "(020) Múzquiz",
-  "informacion": {
-    "nombre_comunidad": "...",
-    "pueblo": "...",
-    "region": "...",
-    "numero_registro": "...",
-    "localidad": "...",
-    "unidad_administrativa": "..."
-  },
-  "datos_generales": {
-    "nombre_lengua_indigena": "...",
-    "significado_nombres": "...",
-    "pueblos_conforman": "...",
-    "autodenominacion_pueblo": "...",
-    "poblacion_total_estimada": "1,075",
-    "latitud_sede": "16.519952000000",
-    "longitud_sede": "-92.017474000000",
-    "tipo_comunidad": [...],
-    "localidad_sede": [...],
-    "listado_asentamientos": [...]
-  }
-}
-```
-
----
-
-## Uso: prototipo con Playwright (alternativa)
-
-Si prefieres ver el navegador en acción o si los endpoints dejan de funcionar:
-
-```powershell
-py -m playwright install chromium
-py inpi_scraper.py --max-pages 1
-```
-
-Consulta la documentación original del prototipo en los comentarios de `inpi_scraper.py`.
-
----
-
-## Ajustes conservadores
-
-La versión por API ya incluye:
-- Pausas aleatorias entre solicitudes
-- Concurrencia limitada (default: 3)
-- Reintentos con backoff exponencial
-- No se recomienda paralelizar más de 5 solicitudes contra un sitio institucional
+Si este repositorio se comparte fuera del equipo, conviene agregar aquí la política interna de uso, distribución y resguardo de datos.
